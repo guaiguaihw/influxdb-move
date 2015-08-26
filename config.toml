@@ -1,0 +1,21 @@
+[userinfo]
+#用户名密码
+username = ""
+password = ""
+
+[srcdb]
+#读取数据的DB
+url = ""
+port = ""
+
+[destdb]
+#写入数据的DB
+url = ""
+port = "
+
+[Time]
+#读取的起止时间
+Start_time = 5
+End_time = 6
+
+
