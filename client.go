@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/url"
 	"time"
-	//"flag"
+	"flag"
 )
 
 func DBclient(host, port string) *client.Client {
@@ -103,17 +103,29 @@ func WriteDB(c *client.Client, b client.BatchPoints) {
 }
 
 func main() {
-	host := "localhost"
-	port := "8086"
-	con := DBclient(host, port)
-	db1 := "mydb"
-	db2 := "yourdb"
+	//host := "localhost"
+	//port := "8086"
+	//db1 := "mydb"
+	//db2 := "yourdb"
+
+	//support to input src and dest DB
+	src := flag.String("s","127.0.0.1", "input an ip of source DB, from which you want to output datas")
+	dest := flag.String("d", "127.0.0.1","input an ip of destination DB, from which you want to input datas")
+	sport := flag.String("sport", "8086", "input a port of source DB,from which you want to output datas")
+	dport := flag.String("dport", "8086", "input a port of destination DB,from which you want to input datas")
+	sdb := flag.String("sdb","mydb", "input name of source DB, from which you want to output datas")
+	ddb := flag.String("ddb", "yourdb","input name of destination DB, from which you want to input datas")
+      
+	flag.Parse()
+
+	scon := DBclient(*src, *sport)
+	dcon := DBclient(*dest, *dport)
 
 	getmeasurements := "show measurements"
-	x := Getmeasurements(con, db1, getmeasurements)
+	x := Getmeasurements(scon, *sdb, getmeasurements)
 	for _, m := range x {
 		getvalues := fmt.Sprintf("select * from  %s", m)
-		y := ReadDB(con, db1, db2, getvalues)
-		WriteDB(con, y)
+		y := ReadDB(scon, *sdb, *ddb, getvalues)
+		WriteDB(dcon, y)
 	}
 }
