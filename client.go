@@ -76,7 +76,7 @@ func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
 	}
 
 	res := response.Results
-	if len(res[0].Series) == 0 {
+	if len(res) == 0 {
 		fmt.Printf("The response of database is null, read database error!\n")
 	} else {
 
@@ -128,7 +128,7 @@ func main() {
 
 	//support to input source and destination database
 	sdb := flag.String("sdb", "mydb", "input name of source DB, from which you want to output datas")
-	ddb := flag.String("ddb", "yourdb", "input name of destination DB, from which you want to input datas")
+        ddb := flag.String("ddb", "yourdb", "input name of destination DB, from which you want to input datas")
 
 	//support to input start time and end time during which you select series from database
 	st := flag.String("sT", "1970-01-01", "input a start time ,from when you want to select datas")
@@ -137,12 +137,12 @@ func main() {
 	flag.Parse()
 
 	scon := DBclient(*src, *sport)
-	dcon := DBclient(*dest, *dport)
+        dcon := DBclient(*dest, *dport)
 
 	getmeasurements := "show measurements"
-	measure := Getmeasurements(scon, *sdb, getmeasurements)
-	for _, m := range measure {
-		getvalues := fmt.Sprintf("select * from  %s where time >  '%s' and time < '%s'", m, *st, *et)
+	measurements := Getmeasurements(scon, *sdb, getmeasurements)
+	for _, m := range measurements {
+	        getvalues := fmt.Sprintf("select * from  %s where time  > '%v' and time < '%v'",m,*st,*et)
 		batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
 		WriteDB(dcon, batchpoints)
 	}
