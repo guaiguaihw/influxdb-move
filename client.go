@@ -115,6 +115,8 @@ func main() {
 	dport := flag.String("dport", "8086", "input a port of destination DB,from which you want to input datas")
 	sdb := flag.String("sdb","mydb", "input name of source DB, from which you want to output datas")
 	ddb := flag.String("ddb", "yourdb","input name of destination DB, from which you want to input datas")
+        st := flag.String("sT", "'1970-01-01'","input a start time ,from when you want to select datas")
+	et := flag.String("eT", "'2100-01-01'", "input an end time, until when you want to select datas")
       
 	flag.Parse()
 
@@ -124,7 +126,7 @@ func main() {
 	getmeasurements := "show measurements"
 	x := Getmeasurements(scon, *sdb, getmeasurements)
 	for _, m := range x {
-		getvalues := fmt.Sprintf("select * from  %s", m)
+		getvalues := fmt.Sprintf("select * from  %s where time > '%s' and time < '%s'", m, *st, *et)
 		y := ReadDB(scon, *sdb, *ddb, getvalues)
 		WriteDB(dcon, y)
 	}
