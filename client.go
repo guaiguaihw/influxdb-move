@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/influxdb/influxdb/client"
-	"log"
 	"net/url"
 	"time"
 )
@@ -14,7 +13,7 @@ func DBclient(host, port string) *client.Client {
 	//connect to database
 	u, err := url.Parse(fmt.Sprintf("http://%s:%s", host, port))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Fail to parse host and port of database, error: %s\n", err.Error())
 	}
 
 	info := client.Config{
@@ -24,7 +23,7 @@ func DBclient(host, port string) *client.Client {
 	var con *client.Client
 	con, err = client.NewClient(info)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Fail to build newclient to database, error: %s\n", err.Error())
 	}
 
 	return con
@@ -37,21 +36,28 @@ func Getmeasurements(c *client.Client, sdb, cmd string) []string {
 		Command:  cmd,
 		Database: sdb,
 	}
+
 	var measurements []string
 
 	response, err := c.Query(q)
-	if err == nil {
-		res := response.Results
+	if err != nil {
+		fmt.Printf("Fail to get response from database, get measurements error: %s\n", err.Error())
+	}
+
+	res := response.Results
+
+	if len(res[0].Series) == 0 {
+		fmt.Printf("The response of database is null, get measurements error!\n")
+	} else {
 
 		values := res[0].Series[0].Values
 		for _, row := range values {
 			measurement := row[0].(string)
 			measurements = append(measurements, measurement)
 		}
-	} else {
-		log.Fatal(err)
 	}
 	return measurements
+
 }
 
 func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
@@ -65,9 +71,14 @@ func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
 	var batchpoints client.BatchPoints
 
 	response, err := c.Query(q)
-	if err == nil {
+	if err != nil {
+		fmt.Printf("Fail to get response from database, read database error: %s\n", err.Error())
+	}
 
-		res := response.Results
+	res := response.Results
+	if len(res[0].Series) == 0 {
+		fmt.Printf("The response of database is null, read database error!\n")
+	} else {
 
 		for _, ser := range res[0].Series {
 
@@ -93,9 +104,6 @@ func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
 		}
 		batchpoints.Database = ddb
 		batchpoints.RetentionPolicy = "default"
-	} else {
-
-		log.Fatal(err)
 	}
 	return batchpoints
 }
@@ -104,21 +112,27 @@ func WriteDB(c *client.Client, b client.BatchPoints) {
 
 	_, err := c.Write(b)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Fail to write to database, error: %s\n", err.Error())
 	}
 }
 
 func main() {
 
-	//support to input src and dest DB
+	//support to input source and destination hosts
 	src := flag.String("s", "127.0.0.1", "input an ip of source DB, from which you want to output datas")
 	dest := flag.String("d", "127.0.0.1", "input an ip of destination DB, from which you want to input datas")
+
+	//support to input source and destination ports
 	sport := flag.String("sport", "8086", "input a port of source DB,from which you want to output datas")
 	dport := flag.String("dport", "8086", "input a port of destination DB,from which you want to input datas")
+
+	//support to input source and destination database
 	sdb := flag.String("sdb", "mydb", "input name of source DB, from which you want to output datas")
 	ddb := flag.String("ddb", "yourdb", "input name of destination DB, from which you want to input datas")
-	st := flag.String("sT", "'1970-01-01'", "input a start time ,from when you want to select datas")
-	et := flag.String("eT", "'2100-01-01'", "input an end time, until when you want to select datas")
+
+	//support to input start time and end time during which you select series from database
+	st := flag.String("sT", "1970-01-01", "input a start time ,from when you want to select datas")
+	et := flag.String("eT", "2100-01-01", "input an end time, until when you want to select datas")
 
 	flag.Parse()
 
@@ -126,10 +140,11 @@ func main() {
 	dcon := DBclient(*dest, *dport)
 
 	getmeasurements := "show measurements"
-	measurements := Getmeasurements(scon, *sdb, getmeasurements)
-	for _, m := range measurements {
-		getvalues := fmt.Sprintf("select * from  %s where time > '%s' and time < '%s'", m, *st, *et)
+	measure := Getmeasurements(scon, *sdb, getmeasurements)
+	for _, m := range measure {
+		getvalues := fmt.Sprintf("select * from  %s where time >  '%s' and time < '%s'", m, *st, *et)
 		batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
 		WriteDB(dcon, batchpoints)
 	}
+	fmt.Printf("Move datas from %s to %s done!\n", *sdb, *ddb)
 }
