@@ -108,7 +108,12 @@ func main() {
 	con := DBclient(host, port)
 	db1 := "mydb"
 	db2 := "yourdb"
-	cmd := "select * from cpu_load_short"
-	y := ReadDB(con, db1, db2, cmd)
-	WriteDB(con, y)
+
+	getmeasurements := "show measurements"
+	x := Getmeasurements(con, db1, getmeasurements)
+	for _, m := range x {
+		getvalues := fmt.Sprintf("select * from  %s", m)
+		y := ReadDB(con, db1, db2, getvalues)
+		WriteDB(con, y)
+	}
 }
