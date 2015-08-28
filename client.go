@@ -145,6 +145,7 @@ func main() {
 	        getvalues := fmt.Sprintf("select * from  %s where time  > '%v' and time < '%v'",m,*st,*et)
 		batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
 		WriteDB(dcon, batchpoints)
+		fmt.Printf("Move measurement:%s from %s to %s done!\n", m, *sdb, *ddb)
 	}
 	fmt.Printf("Move datas from %s to %s done!\n", *sdb, *ddb)
 }
