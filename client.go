@@ -12,7 +12,7 @@ import (
 func DBclient(host, port string) *client.Client {
 
 	//connect to database
-	u, err := url.Parse(fmt.Sprintf("http://%s:%s", host, port))
+	u, err := url.Parse(fmt.Sprintf("http://%v:%v", host, port))
 	if err != nil {
 		fmt.Printf("Fail to parse host and port of database, error: %s\n", err.Error())
 	}
@@ -58,7 +58,7 @@ func Getmeasurements(c *client.Client, sdb, cmd string) []string {
 		bar := pb.StartNew(count)
 
 		for _, row := range values {
-			measurement := row[0].(string)
+			measurement := fmt.Sprintf("%v",row[0])
 			measurements = append(measurements, measurement)
 			bar.Increment()
 			time.Sleep(3 * time.Millisecond)
@@ -163,11 +163,11 @@ func main() {
 	bar := pb.StartNew(count)
 
 	for _, m := range measurements {
-		getvalues := fmt.Sprintf("select * from  %s where time  > '%v' and time < '%v'", m, *st, *et)
+		getvalues := fmt.Sprintf("select * from  \"%v\" where time  > '%v' and time < '%v'", m, *st, *et)
 		batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
 		WriteDB(dcon, batchpoints)
 		bar.Increment()
-		time.Sleep(3 * time.Millisecond)
+		time.Sleep(50 * time.Second)
 	}
 	bar.FinishPrint("Write to Database has Finished")
 	fmt.Printf("Move datas from %s to %s has done!\n", *sdb, *ddb)
