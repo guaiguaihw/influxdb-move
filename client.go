@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cheggaaa/pb"
 	"github.com/influxdb/influxdb/client"
 	"net/url"
 	"time"
@@ -51,10 +52,18 @@ func Getmeasurements(c *client.Client, sdb, cmd string) []string {
 	} else {
 
 		values := res[0].Series[0].Values
+
+		//show progress of getting measurements
+		count := len(values)
+		bar := pb.StartNew(count)
+
 		for _, row := range values {
 			measurement := row[0].(string)
 			measurements = append(measurements, measurement)
+			bar.Increment()
+			time.Sleep(3 * time.Millisecond)
 		}
+		bar.FinishPrint("Get measurements has finished!\n")
 	}
 	return measurements
 
@@ -80,6 +89,10 @@ func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
 		fmt.Printf("The response of database is null, read database error!\n")
 	} else {
 
+		//show progress of reading series
+		count := len(res[0].Series)
+		bar := pb.StartNew(count)
+
 		for _, ser := range res[0].Series {
 
 			//get type client.Point
@@ -101,9 +114,12 @@ func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
 				point.Precision = "s"
 				batchpoints.Points = append(batchpoints.Points, point)
 			}
+			bar.Increment()
+			time.Sleep(3 * time.Millisecond)
 		}
 		batchpoints.Database = ddb
 		batchpoints.RetentionPolicy = "default"
+		bar.FinishPrint("Read series has finished!\n")
 	}
 	return batchpoints
 }
@@ -128,24 +144,31 @@ func main() {
 
 	//support to input source and destination database
 	sdb := flag.String("sdb", "mydb", "input name of source DB, from which you want to output datas")
-        ddb := flag.String("ddb", "yourdb", "input name of destination DB, from which you want to input datas")
+	ddb := flag.String("ddb", "yourdb", "input name of destination DB, from which you want to input datas")
 
 	//support to input start time and end time during which you select series from database
-	st := flag.String("sT", "1970-01-01", "input a start time ,from when you want to select datas")
-	et := flag.String("eT", "2100-01-01", "input an end time, until when you want to select datas")
+	st := flag.String("stime", "1970-01-01", "input a start time ,from when you want to select datas")
+	et := flag.String("etime", "2100-01-01", "input an end time, until when you want to select datas")
 
 	flag.Parse()
 
 	scon := DBclient(*src, *sport)
-        dcon := DBclient(*dest, *dport)
+	dcon := DBclient(*dest, *dport)
 
 	getmeasurements := "show measurements"
 	measurements := Getmeasurements(scon, *sdb, getmeasurements)
+
+	//show progress of writing to database
+	count := len(measurements)
+	bar := pb.StartNew(count)
+
 	for _, m := range measurements {
-	        getvalues := fmt.Sprintf("select * from  %s where time  > '%v' and time < '%v'",m,*st,*et)
+		getvalues := fmt.Sprintf("select * from  %s where time  > '%v' and time < '%v'", m, *st, *et)
 		batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
 		WriteDB(dcon, batchpoints)
-		fmt.Printf("Move measurement:%s from %s to %s done!\n", m, *sdb, *ddb)
+		bar.Increment()
+		time.Sleep(3 * time.Millisecond)
 	}
-	fmt.Printf("Move datas from %s to %s done!\n", *sdb, *ddb)
+	bar.FinishPrint("Write to Database has Finished")
+	fmt.Printf("Move datas from %s to %s has done!\n", *sdb, *ddb)
 }
