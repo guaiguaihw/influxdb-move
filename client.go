@@ -168,9 +168,21 @@ func main() {
 	for _, m := range measurements {
 
 		template := "2006-01-02 15:04:05"
-		since_time, _ := time.Parse(template, "1970-01-01 00:00:00")
-		stime, _ := time.Parse(template, fmt.Sprintf("%v", *st))
-		etime, _ := time.Parse(template, fmt.Sprintf("%v", *et))
+
+		since_time, err_sin := time.Parse(template, "1970-01-01 00:00:00")
+		if err_sin != nil {
+			fmt.Println("Fail to parse since_time")
+		}
+
+		stime, err_st := time.Parse(template, fmt.Sprintf("%v", *st))
+		if err_st != nil {
+			fmt.Println("Fail to parse stime")
+		}
+
+		etime, err_et := time.Parse(template, fmt.Sprintf("%v", *et))
+		if err_et != nil {
+			fmt.Println("Fail to parse etime")
+		}
 
 		s_epoch := stime.Sub(since_time)
 		e_epoch := etime.Sub(since_time)
