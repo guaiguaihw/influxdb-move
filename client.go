@@ -58,7 +58,7 @@ func Getmeasurements(c *client.Client, sdb, cmd string) []string {
 		bar := pb.StartNew(count)
 
 		for _, row := range values {
-			measurement := fmt.Sprintf("%v",row[0])
+			measurement := fmt.Sprintf("%v", row[0])
 			measurements = append(measurements, measurement)
 			bar.Increment()
 			time.Sleep(3 * time.Millisecond)
@@ -89,37 +89,40 @@ func ReadDB(c *client.Client, sdb, ddb, cmd string) client.BatchPoints {
 		fmt.Printf("The response of database is null, read database error!\n")
 	} else {
 
-		//show progress of reading series
-		count := len(res[0].Series)
-		bar := pb.StartNew(count)
+		res_length := len(res)
+		for k := 0; k < res_length; k++ {
 
-		for _, ser := range res[0].Series {
+			//show progress of reading series
+			count := len(res[k].Series)
+			bar := pb.StartNew(count)
+			for _, ser := range res[k].Series {
 
-			//get type client.Point
-			var point client.Point
+				//get type client.Point
+				var point client.Point
 
-			point.Measurement = ser.Name
-			point.Tags = ser.Tags
-			for _, v := range ser.Values {
-				point.Time, _ = time.Parse(time.RFC3339, v[0].(string))
+				point.Measurement = ser.Name
+				point.Tags = ser.Tags
+				for _, v := range ser.Values {
+					point.Time, _ = time.Parse(time.RFC3339, v[0].(string))
 
-				field := make(map[string]interface{})
-				l := len(v)
-				for i := 1; i < l; i++ {
-					if v[i] != nil {
-						field[ser.Columns[i]] = v[i]
+					field := make(map[string]interface{})
+					l := len(v)
+					for i := 1; i < l; i++ {
+						if v[i] != nil {
+							field[ser.Columns[i]] = v[i]
+						}
 					}
+					point.Fields = field
+					point.Precision = "s"
+					batchpoints.Points = append(batchpoints.Points, point)
 				}
-				point.Fields = field
-				point.Precision = "s"
-				batchpoints.Points = append(batchpoints.Points, point)
+				bar.Increment()
+				time.Sleep(3 * time.Millisecond)
 			}
-			bar.Increment()
-			time.Sleep(3 * time.Millisecond)
+			bar.FinishPrint("Read series has finished!\n")
 		}
 		batchpoints.Database = ddb
 		batchpoints.RetentionPolicy = "default"
-		bar.FinishPrint("Read series has finished!\n")
 	}
 	return batchpoints
 }
@@ -147,8 +150,8 @@ func main() {
 	ddb := flag.String("ddb", "yourdb", "input name of destination DB, from which you want to input datas")
 
 	//support to input start time and end time during which you select series from database
-	st := flag.String("stime", "1970-01-01", "input a start time ,from when you want to select datas")
-	et := flag.String("etime", "2100-01-01", "input an end time, until when you want to select datas")
+	st := flag.String("stime", "1970-01-01 00:00:00", "input a start time ,from when you want to select datas")
+	et := flag.String("etime", "2100-01-01 00:00:00", "input an end time, until when you want to select datas")
 
 	flag.Parse()
 
@@ -159,16 +162,48 @@ func main() {
 	measurements := Getmeasurements(scon, *sdb, getmeasurements)
 
 	//show progress of writing to database
-	count := len(measurements)
-	bar := pb.StartNew(count)
+	count_outer := len(measurements)
+	bar_outer := pb.StartNew(count_outer)
 
 	for _, m := range measurements {
-		getvalues := fmt.Sprintf("select * from  \"%v\" where time  > '%v' and time < '%v'", m, *st, *et)
-		batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
-		WriteDB(dcon, batchpoints)
-		bar.Increment()
-		time.Sleep(50 * time.Second)
+
+		template := "2006-01-02 15:04:05"
+		since_time, _ := time.Parse(template, "1970-01-01 00:00:00")
+		stime, _ := time.Parse(template, fmt.Sprintf("%v", *st))
+		etime, _ := time.Parse(template, fmt.Sprintf("%v", *et))
+
+		s_epoch := stime.Sub(since_time)
+		e_epoch := etime.Sub(since_time)
+
+		h_length := int(e_epoch.Hours()-s_epoch.Hours()) + 1
+
+		//The datas which can be inputed is less than a year
+		if h_length > 8760 {
+			h_length = 8760
+		}
+
+		//show progress of each measurement writing to database
+		count := h_length
+		bar := pb.StartNew(count)
+
+		//write datas of every hour
+		for i := 0; i < h_length; i++ {
+
+			startsec := int(s_epoch.Seconds() + float64(i*3600))
+			endsec := int(s_epoch.Seconds() + float64((i+1)*3600))
+
+			getvalues := fmt.Sprintf("select * from  \"%v\" where time  > %vs and time < %vs group by *", m, startsec, endsec)
+			batchpoints := ReadDB(scon, *sdb, *ddb, getvalues)
+			WriteDB(dcon, batchpoints)
+
+			bar.Increment()
+			time.Sleep(time.Millisecond)
+		}
+		bar.FinishPrint("Measurement:" + m + ",Write to Database has Finished")
+
+		bar_outer.Increment()
+		time.Sleep(time.Millisecond)
 	}
-	bar.FinishPrint("Write to Database has Finished")
+	bar_outer.FinishPrint("Write to Database has Finished")
 	fmt.Printf("Move datas from %s to %s has done!\n", *sdb, *ddb)
 }
